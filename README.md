@@ -1,4 +1,4 @@
-# claude-code
+# 4451-Rag-Demos
 Temporary repository to experiment with Claude Code.
 
 ## Agentic RAG (query decomposition + Chroma)
