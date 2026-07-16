@@ -1,0 +1,32 @@
+"""CLI: chunk .txt files in a directory and upsert them into a Chroma collection."""
+import argparse
+import sys
+
+from rag.config import DEFAULT_COLLECTION, DEFAULT_DB_PATH, DEFAULT_DOCS_DIR
+from rag.ingestion import ingest
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Ingest .txt files into a Chroma collection.")
+    parser.add_argument("docs_dir", nargs="?", default=DEFAULT_DOCS_DIR,
+                         help=f"Directory of .txt files (default: {DEFAULT_DOCS_DIR})")
+    parser.add_argument("--db-path", default=DEFAULT_DB_PATH, help="Chroma persistent storage path")
+    parser.add_argument("--collection", default=DEFAULT_COLLECTION, help="Chroma collection name")
+    args = parser.parse_args()
+
+    try:
+        count = ingest(args.docs_dir, args.db_path, args.collection)
+    except FileNotFoundError as e:
+        print(f"Error: {e}")
+        sys.exit(1)
+
+    if count == 0:
+        print(f"No .txt files found in '{args.docs_dir}'. Nothing ingested.")
+        return
+
+    print(f"Ingested {count} chunks from '{args.docs_dir}' into collection "
+          f"'{args.collection}' at '{args.db_path}'.")
+
+
+if __name__ == "__main__":
+    main()
