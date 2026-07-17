@@ -8,6 +8,33 @@ from the combined context.
 Built on the shared engine in [`core/`](../../core) — see the repo root
 [README](../../README.md) for the overall monorepo structure and setup.
 
+## Why query decomposition?
+
+A single complex question (e.g. "Can OpenAI share my data with third
+parties, and can I delete my account?") is really two separable questions.
+Embedding the whole question as one query blurs its vector between two
+unrelated topics, so semantic search retrieves chunks that are mediocre
+matches for *both* halves instead of good matches for either. Decomposing
+first means each sub-question gets its own targeted retrieval pass, and the
+synthesis step re-combines the results — trading one retrieval call for
+several more precise ones.
+
+## Why two chunking strategies?
+
+- **`fixed`** splits text into equal-size windows. It's simple and
+  strategy-agnostic, but can cut a legal clause in half or merge unrelated
+  clauses into one chunk, which hurts both retrieval precision and citation
+  accuracy.
+- **`structured`** splits on the documents' own boundaries (section
+  headings, numbered/lettered clauses), so a retrieved chunk is always one
+  complete, citable unit. The tradeoff is that it's corpus-specific — it
+  assumes the legal-document structure these sample files have, whereas
+  `fixed` works on any text.
+
+Comparing the two strategies against the same questions is the point of
+keeping them in separate collections (`documents_fixed` /
+`documents_structured`) rather than picking one.
+
 All commands below assume you're running from the **repo root** (not this
 directory), so that `./data` and `./chroma_db` resolve correctly.
 
@@ -54,6 +81,36 @@ python projects/v1-agentic-rag/rag_agent.py "your question" --collection documen
 
 Or run without an argument to be prompted interactively. The script prints
 the decomposed sub-questions, then the final synthesized answer.
+
+### Worked example
+
+```
+$ python projects/v1-agentic-rag/rag_agent.py \
+    "Can OpenAI share my data with third parties, and can I delete my account?"
+
+Decomposing query...
+  1. Under what circumstances does OpenAI share user data with third parties
+     (what types of third parties, purposes, and legal bases)?
+  2. How can I delete my OpenAI account and what happens to my data after I
+     request deletion (steps, timeframe, and retention/backup policy)?
+Retrieving context from Chroma...
+Synthesizing answer...
+
+Short answer
+- Yes — OpenAI may share data with third parties in certain circumstances
+  (see details below). [Source: 04_data-processing-addendum.txt, chunk 12; ...]
+- For Customers under a DPA, OpenAI commits to direct subprocessors to
+  delete Customer Data within 30 days of DPA termination. The excerpts do
+  not contain step-by-step consumer self-service deletion instructions.
+  [Source: 01_terms-of-use.txt, chunk 12; 04_data-processing-addendum.txt, chunk 26]
+...
+```
+
+Two things worth noticing in this output: (1) the original question became
+two independent sub-questions before any retrieval happened, and (2) every
+claim in the answer is tied to a specific source file and chunk — that
+traceability is what `metadata` carries through `retrieve()` into
+`synthesize()`.
 
 ## Retrieval
 

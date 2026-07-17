@@ -30,6 +30,43 @@ from scratch.
 └── requirements.txt
 ```
 
+## How a query flows through the system
+
+```
+                       INGEST (offline, run once per chunking strategy)
+.txt files  --[chunk]-->  chunks + metadata  --[embed + upsert]-->  Chroma collection
+                                                                (documents_fixed /
+                                                                 documents_structured)
+
+                       QUERY (run per question)
+user question
+     |
+     v
+[decompose]  -->  sub-questions (2-4, each independently answerable)
+     |
+     v
+[retrieve]   -->  per sub-question: nearest-neighbor semantic search against
+     |             the chosen Chroma collection (no keyword/lexical matching)
+     v
+[synthesize] -->  final answer, citing source + chunk/section for each claim
+```
+
+`core/pipeline.py:run()` wires the query-side three steps together;
+`core/ingestion.py:ingest()` is the offline ingest step. See
+[`core/`](core) module docstrings for what each stage does.
+
+## Conventions
+
+- **Docstrings:** every `core/` module has a one-line docstring stating its
+  purpose. A module gets a longer docstring only when a design choice needs
+  justifying to a reader who didn't make it — e.g. `structured_chunking.py`
+  explains *why* it splits on section/clause boundaries instead of fixed
+  width, because that choice isn't obvious from the code alone.
+- **Naming:** `fixed` / `structured` name chunking *strategies*;
+  `documents_fixed` / `documents_structured` name the Chroma *collections*
+  each strategy writes to. They're related but not the same kind of thing —
+  see [`core/config.py:collection_name()`](core/config.py).
+
 ## Versioning convention
 
 - **`core/`** holds logic that is genuinely shared and stable across projects
